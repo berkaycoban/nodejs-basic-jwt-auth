@@ -35,7 +35,7 @@ exports.signUp = (req, res, next) => {
     return res.status(422).json({ errors: errors });
   }
 
-  User.findOne({ email: req.body, email })
+  User.findOne({ email: email })
     .then((user) => {
       if (user) {
         return res
@@ -91,34 +91,35 @@ exports.signIn = (req, res) => {
   User.findOne({ email: email })
     .then((user) => {
       if (!user) {
-        return res.status(404).json({ errors: [{ user: "not found" }] });
-      } else {
-        bcrypt.compare(password, user.password).then((isMatch) => {
-          if (!isMatch) {
-            return res.status(400).json({
-              errors: [
-                {
-                  password: "incorrect",
-                },
-              ],
-            });
-          }
+        return res.status(404).json({
+          errors: [{ user: "not found" }],
         });
-
-        let accessToken = createJWT(user.email, user._id, 3600);
-
-        jwt
-          .verify(accessToken, process.env.TOKEN_SECRET, (err, decoded) => {
-            if (err) {
-              res.status(500).json({ errors: err });
+      } else {
+        bcrypt
+          .compare(password, user.password)
+          .then((isMatch) => {
+            if (!isMatch) {
+              return res
+                .status(400)
+                .json({ errors: [{ password: "incorrect" }] });
             }
-            if (decoded) {
-              return res.status(200).json({
-                success: true,
-                token: access_token,
-                message: user,
-              });
-            }
+            let access_token = createJWT(user.email, user._id, 3600);
+            jwt.verify(
+              access_token,
+              process.env.TOKEN_SECRET,
+              (err, decoded) => {
+                if (err) {
+                  res.status(500).json({ erros: err });
+                }
+                if (decoded) {
+                  return res.status(200).json({
+                    success: true,
+                    token: access_token,
+                    message: user,
+                  });
+                }
+              }
+            );
           })
           .catch((err) => {
             res.status(500).json({ erros: err });
