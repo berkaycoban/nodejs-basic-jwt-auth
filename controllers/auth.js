@@ -7,7 +7,7 @@ const { createJWT } = require("../utils/auth");
 const emailRegexp =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-exports.signUp = (req, res, next) => {
+exports.signUp = async (req, res) => {
   let { name, email, password, password_confirmation } = req.body;
   let errors = [];
 
@@ -35,43 +35,41 @@ exports.signUp = (req, res, next) => {
     return res.status(422).json({ errors: errors });
   }
 
-  User.findOne({ email: email })
-    .then((user) => {
-      if (user) {
-        return res
-          .status(422)
-          .json({ errors: [{ user: "email already exists" }] });
-      } else {
-        const user = new User(req.body);
+  try {
+    const user = await User.findOne({ email: email });
 
-        bcrypt.genSalt(10, (err, salt) => {
-          bcrypt.hash(password, salt, (err, hash) => {
-            if (err) throw err;
+    if (user) {
+      return res
+        .status(422)
+        .json({ errors: [{ user: "email already exists" }] });
+    } else {
+      const user = new User(req.body);
 
-            user.password = hash;
-            user
-              .save()
-              .then((response) => {
-                res.status(200).json({
-                  success: true,
-                  result: response,
-                });
-              })
-              .catch((err) => {
-                res.status(500).json({
-                  errors: [{ error: err }],
-                });
-              });
-          });
+      bcrypt.genSalt(10, (err, salt) => {
+        bcrypt.hash(password, salt, async (err, hash) => {
+          if (err) throw err;
+
+          user.password = hash;
+
+          try {
+            let result = await user.save();
+
+            res.status(200).json({
+              success: true,
+              result: result,
+            });
+          } catch (error) {
+            res.status(500).json({ errors: error });
+          }
         });
-      }
-    })
-    .catch((err) => {
-      res.status(500).json({ erros: err });
-    });
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ errors: error });
+  }
 };
 
-exports.signIn = (req, res) => {
+exports.signIn = async (req, res) => {
   let { email, password } = req.body;
   let errors = [];
 
@@ -88,45 +86,39 @@ exports.signIn = (req, res) => {
     return res.status(422).json({ errors: errors });
   }
 
-  User.findOne({ email: email })
-    .then((user) => {
-      if (!user) {
-        return res.status(404).json({
-          errors: [{ user: "not found" }],
-        });
-      } else {
-        bcrypt
-          .compare(password, user.password)
-          .then((isMatch) => {
-            if (!isMatch) {
-              return res
-                .status(400)
-                .json({ errors: [{ password: "incorrect" }] });
+  try {
+    const user = await User.findOne({ email: email });
+
+    if (!user) {
+      return res.status(404).json({
+        errors: [{ user: "not found" }],
+      });
+    } else {
+      try {
+        let isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+          return res.status(400).json({ errors: [{ password: "incorrect" }] });
+        } else {
+          let access_token = createJWT(user.email, user._id, 3600);
+          jwt.verify(access_token, process.env.TOKEN_SECRET, (err, decoded) => {
+            if (err) {
+              res.status(500).json({ erros: err });
             }
-            let access_token = createJWT(user.email, user._id, 3600);
-            jwt.verify(
-              access_token,
-              process.env.TOKEN_SECRET,
-              (err, decoded) => {
-                if (err) {
-                  res.status(500).json({ erros: err });
-                }
-                if (decoded) {
-                  return res.status(200).json({
-                    success: true,
-                    token: access_token,
-                    message: user,
-                  });
-                }
-              }
-            );
-          })
-          .catch((err) => {
-            res.status(500).json({ erros: err });
+            if (decoded) {
+              return res.status(200).json({
+                success: true,
+                token: access_token,
+                message: user,
+              });
+            }
           });
+        }
+      } catch (error) {
+        res.status(500).json({ errors: error });
       }
-    })
-    .catch((err) => {
-      res.status(500).json({ erros: err });
-    });
+    }
+  } catch (error) {
+    res.status(500).json({ errors: error });
+  }
 };
