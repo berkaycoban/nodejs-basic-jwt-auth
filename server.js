@@ -4,6 +4,9 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 require("dotenv").config();
 
+// import routes
+const authRoutes = require("./routes/auth");
+
 // app
 const app = express();
 
@@ -19,6 +22,9 @@ mongoose
 // middlewares
 app.use(bodyParser.json());
 app.use(cors());
+
+// routes middlewares
+app.use("/api", authRoutes);
 
 const port = process.env.PORT || 8000;
 
