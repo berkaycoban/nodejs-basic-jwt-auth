@@ -4,8 +4,37 @@ const bcrypt = require("bcrypt");
 
 const { createJWT } = require("../utils/auth");
 
+const emailRegexp =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
 exports.signUp = (req, res, next) => {
-  // let { name, email, password, password_confirmation } = req.body;
+  let { name, email, password, password_confirmation } = req.body;
+  let errors = [];
+
+  if (!name) {
+    errors.push({ name: "required" });
+  }
+  if (!email) {
+    errors.push({ email: "required" });
+  }
+  if (!emailRegexp.test(email)) {
+    errors.push({ email: "invalid" });
+  }
+  if (!password) {
+    errors.push({ password: "required" });
+  }
+  if (!password_confirmation) {
+    errors.push({
+      password_confirmation: "required",
+    });
+  }
+  if (password != password_confirmation) {
+    errors.push({ password: "mismatch" });
+  }
+  if (errors.length > 0) {
+    return res.status(422).json({ errors: errors });
+  }
+
   User.findOne({ email: req.body, email })
     .then((user) => {
       if (user) {
@@ -44,6 +73,20 @@ exports.signUp = (req, res, next) => {
 
 exports.signIn = (req, res) => {
   let { email, password } = req.body;
+  let errors = [];
+
+  if (!email) {
+    errors.push({ email: "required" });
+  }
+  if (!emailRegexp.test(email)) {
+    errors.push({ email: "invalid email" });
+  }
+  if (!password) {
+    errors.push({ passowrd: "required" });
+  }
+  if (errors.length > 0) {
+    return res.status(422).json({ errors: errors });
+  }
 
   User.findOne({ email: email })
     .then((user) => {
